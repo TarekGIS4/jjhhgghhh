@@ -1,173 +1,305 @@
 <!DOCTYPE html>
 <html lang="ar">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شبكات الطرق الذكية</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-      body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: row;
-        height: 100vh;
-      }
-  
-      .sidebar {
-        width: 250px;
-        background: #dcd3d3;
-        padding: 15px;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-      }
-  
-      .service-btn {
-        display: flex;
-        align-items: center;
-        background: white;
-        border: none;
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-        text-align: left;
-        transition: background 0.3s;
-      }
-      
-      .service-btn:hover {
-        background: #e0e0e0;
-      }
-  
-      .service-btn span {
-        margin-right: 10px;
-        font-size: 20px;
-      }
-  
-      #map {
-        flex: 1;
-        width: 100%;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="sidebar">
-      <h2>الخدمات المتاحة</h2>
-      <button class="service-btn" id="healthBtn"><span>🏥</span>الخدمات الصحية</button>
-      <button class="service-btn" id="educationBtn"><span>🏫</span>الخدمات التعليمية</button>
-      <button class="service-btn" id="commercialBtn"><span>🛒</span>الخدمات التجارية</button>
-      <button class="service-btn" id="routeBtn"><span>🚗</span>أفضل طريق</button>
-      <button class="service-btn" id="addPointBtn"><span>➕</span>إضافة نقطة</button>
-    </div>
-    <div id="map"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>خريطة خدمات بني سويف - نقطة انطلاق الفشن</title>
+  <!-- مكتبات ليفلت -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Routing Machine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+    }
+    .sidebar {
+      width: 260px;
+      background: #f5f3f3;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.08);
+      z-index: 999;
+    }
+    .sidebar h2 { font-size: 20px; margin-bottom: 10px; }
+    .service-btn {
+      display: flex;
+      align-items: center;
+      background: white;
+      border: none;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      text-align: left;
+      transition: background 0.3s;
+    }
+    .service-btn span { margin-right: 10px; font-size: 20px; }
+    .service-btn:hover { background: #e0e0e0; }
+    #destinationSelect {
+      width: 100%;
+      padding: 8px;
+      margin: 10px 0;
+      font-size: 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    #map { flex: 1; width: 100%; }
+    .leaflet-popup-content img { max-width: 220px; display: block; margin: 5px auto; border-radius: 6px; }
+    .route-details {
+      background: #fff;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px #0001;
+      max-width: 350px;
+      position: absolute;
+      left: 280px;
+      top: 20px;
+      z-index: 1000;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>الاماكن والخدمات السياحية</h2>
+    <button class="service-btn" id="pharaonicBtn"><span>🏺</span>الآثار الفرعونية</button>
+    <button class="service-btn" id="copticBtn"><span>✝️</span>الآثار القبطية</button>
+    <button class="service-btn" id="mosqueBtn"><span>🕌</span>المساجد</button>
+    <button class="service-btn" id="hotelBtn"><span>🏨</span>الفنادق</button>
+    <button class="service-btn" id="entertainBtn"><span>🎡</span>المناطق الترفيهية</button>
+    <hr>
+    <label for="destinationSelect"><b>اختر وجهة:</b></label>
+    <select id="destinationSelect">
+      <option value="">-- اختر --</option>
+    </select>
+    <button class="service-btn" id="routeBtn"><span>🚗</span>أفضل طريق</button>
+  </div>
+  <div id="map"></div>
+  <div id="routeDetails" class="route-details"></div>
   <script>
-    // 1. إعداد الخريطة
-    const map = L.map('map').setView([30.0444, 31.2357], 13);
+    // نقطة الانطلاق: محطة القطار السريع الفشن
+    const startPoint = {
+      name: "محطة القطار السريع الفشن",
+      lat: 28.91055,
+      lng: 30.74477
+    };
+
+    // جميع المعالم (آثار فرعونية، قبطية، مساجد، ترفيهية، فنادق)
+    const places = [
+      // آثار فرعونية
+      {name:"أبو صير الملق", type:"آثار فرعونية", lat:29.2506, lng:31.0786, img:"https://g.top4top.io/p_3442ietu51.jpg"},
+      {name:"سدمنت الجبل", type:"آثار فرعونية", lat:29.0838, lng:30.9344, img:"https://k.top4top.io/p_34341ggyr2.jpg"},
+      {name:"دشاشة", type:"آثار فرعونية", lat:28.9872, lng:30.8488, img:"https://l.top4top.io/p_3434csn4t3.jpg"},
+      {name:"غياضة الشرقية", type:"آثار فرعونية", lat:28.8997, lng:31.3556, img:"https://a.top4top.io/p_3434299ir4.jpg"},
+      {name:"الحيبة", type:"آثار فرعونية", lat:28.7729, lng:30.9226, img:"https://b.top4top.io/p_3434csnxy5.jpg"},
+      {name:"هرم ميدوم", type:"آثار فرعونية", lat:29.3897, lng:31.1606, img:"https://c.top4top.io/p_3434khldm6.jpg"},
+      // آثار قبطية
+      {name:"كنيسة السيدة العذراء بالمطرانية", type:"آثار قبطية", lat:29.072096, lng:31.096299, img:"https://j.top4top.io/p_3435opqty1.jpg"},
+      {name:"دير السيدة العذراء بياض العرب", type:"آثار قبطية", lat:29.064792, lng:31.121207, img:"https://k.top4top.io/p_3435fltj32.jpg"},
+      {name:"الآثار القبطية في سدمنت الجبل", type:"آثار قبطية", lat:29.147117, lng:30.902566, img:"https://l.top4top.io/p_3435ae1f83.jpg"},
+      {name:"دير الميمون بني سويف", type:"آثار قبطية", lat:29.237740, lng:31.194399, img:"https://a.top4top.io/p_34350kryj4.jpg"},
+      {name:"كنيسة الثلاث قديسين بني سويف", type:"آثار قبطية", lat:29.075545, lng:31.104722, img:"https://b.top4top.io/p_3435zt8jg5.jpg"},
+      {name:"دير الأنبا أنطونيوس - مركز ناصر", type:"آثار قبطية", lat:29.150462, lng:31.129167, img:"https://c.top4top.io/p_343500oiq6.jpg"},
+      // المساجد
+      {name:"مسجد السيدة حورية", type:"مسجد", lat:29.07225, lng:31.09658, img:"https://i.top4top.io/p_3442r9a4q1.jpg"},
+      {name:"مسجد الغمراوي", type:"مسجد", lat:29.0739, lng:31.0967, img:"https://j.top4top.io/p_3442xbv8e2.jpg"},
+      {name:"المسجد الكبير بدلاص", type:"مسجد", lat:29.186917, lng:31.133800, img:"https://k.top4top.io/p_3442yqnhg3.jpg"},
+      // أماكن ترفيهية
+      {name:"حديقة حيوان بني سويف", type:"مكان ترفيهي", lat:29.083975, lng:31.102454, img:"https://c.top4top.io/p_3434s42dc1.jpg"},
+      {name:"حي الزهور", type:"مكان ترفيهي", lat:29.085289, lng:31.108713, img:"https://h.top4top.io/p_3434v7jxt1.jpg"},
+      {name:"حديقة المنتزه", type:"مكان ترفيهي", lat:29.076397, lng:31.104314, img:"https://e.top4top.io/p_3434hlunc3.jpg"},
+      {name:"كورنيش النيل", type:"مكان ترفيهي", lat:29.072872, lng:31.115374, img:"https://f.top4top.io/p_343406z7l4.jpg"},
+      {name:"قصر ثقافة بني سويف", type:"مكان ترفيهي", lat:29.063914, lng:31.100570, img:"https://g.top4top.io/p_3434er4bk6.jpg"},
+      {name:"نادي بني سويف الرياضي", type:"مكان ترفيهي", lat:29.062624, lng:31.100407, img:"https://d.top4top.io/p_3434zyro82.jpg"}
+    ];
+
+    // الفنادق
+    const hotels = [
+      {name:"فندق قصر البكري", type:"فندق", lat:29.076568, lng:31.099924, img:"https://g.top4top.io/p_3442pwgpc1.jpg", link:"https://www.facebook.com/people/%D9%85%D8%B7%D8%B9%D9%85-%D9%88-%D9%81%D9%86%D8%AF%D9%82-%D9%82%D8%B5%D8%B1-%D8%A7%D9%84%D8%A8%D9%83%D8%B1%D9%8A-Bakry-Palace/61571227116479/#"},
+      {name:"فندق سقارة في بني سويف", type:"فندق", lat:29.076142, lng:31.095980, img:"https://j.top4top.io/p_3442s8n8s4.jpg", link:"https://www.facebook.com/Saqqarahotel/?locale=ar_AR"},
+      {name:"Green House Hotel", type:"فندق", lat:29.070899, lng:31.098415, img:"https://k.top4top.io/p_34425xsgz5.jpg", link:"https://www.facebook.com/Green.House.Bs/?locale=ar_AR"},
+      {name:"City Center Hotel, Beni Suef", type:"فندق", lat:29.075910, lng:31.095090, img:"https://l.top4top.io/p_3442a6t7v6.jpg", link:"https://www.facebook.com/citycenterhotelbanisuief/"},
+      {name:"Jewel Inn Beni Suef", type:"فندق", lat:29.063129, lng:31.100905, img:"https://b.top4top.io/p_3442k5q228.jpg", link:"https://www.facebook.com/JEWELBENISUEF/?locale=ar_AR"},
+      {name:"فندق دشيشة", type:"فندق", lat:29.075810, lng:31.094607, img:"https://h.top4top.io/p_3442i71112.jpg", link:"https://dezone.net/hotel/%D9%81%D9%86%D8%AF%D9%82-%D8%AF%D8%B4%D9%8A%D8%B4%D8%A9-%D8%A8%D8%A8%D9%86%D9%8A-%D8%B3%D9%88%D9%8A%D9%81/"},
+      {name:"فندق سميراميس", type:"فندق", lat:29.076165, lng:31.095583, img:"https://i.top4top.io/p_3442cyajs3.jpg", link:"https://www.booking.com/hotel/eg/semiramis-beni-suef.ar.html"},
+      {name:"فندق المروة", type:"فندق", lat:29.072082, lng:31.068517, img:"https://a.top4top.io/p_3442ci0oq7.jpg", link:"https://www.alhojozat.com/all/hotel.php?ca=eg&hotel=El_Marwa_Hotel"}
+    ];
+
+    // دمج كل الأماكن في متغير واحد
+    const allPlaces = [...places, ...hotels];
+
+    // أيقونات مخصصة
+    const icons = {
+  "آثار فرعونية": L.divIcon({
+    html: '<span style="font-size:24px;">🏺</span>',
+    className: 'custom-div-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28]
+  }),
+  "آثار قبطية": L.divIcon({
+    html: '<span style="font-size:24px;">✝️</span>',
+    className: 'custom-div-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28]
+  }),
+  "مسجد": L.divIcon({
+    html: '<span style="font-size:24px;">🕌</span>',
+    className: 'custom-div-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28]
+  }),
+  "فندق": L.divIcon({
+    html: '<span style="font-size:24px;">🏨</span>',
+    className: 'custom-div-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28]
+  }),
+  "مكان ترفيهي": L.divIcon({
+    html: '<span style="font-size:24px;">🎡</span>',
+    className: 'custom-div-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28]
+  })
+};
+
+
+    // إعداد الخريطة على محطة القطار السريع الفشن
+    const map = L.map('map').setView([startPoint.lat, startPoint.lng], 10);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    let startMarker = null;
-    let endMarker = null;
-    let routeLayer = null;
-    let serviceMarkers = [];
+    // ماركر محطة القطار
+    const stationMarker = L.marker([startPoint.lat, startPoint.lng], {
+      icon: L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/128/684/684908.png", iconSize:[32,32]})
+    }).addTo(map).bindPopup(`<b>${startPoint.name}</b>`);
 
-    // إضافة ماركر
-    const createDraggableMarker = (latlng, popupText) => {
-      return L.marker(latlng, { draggable: true })
-        .bindPopup(popupText)
-        .addTo(map);
+    // طبقات
+    const layerGroups = {
+      pharaonic: L.layerGroup().addTo(map),
+      coptic: L.layerGroup().addTo(map),
+      mosque: L.layerGroup().addTo(map),
+      hotel: L.layerGroup().addTo(map),
+      entertain: L.layerGroup().addTo(map)
     };
 
-    // نقاط البداية والنهاية
-    map.on('click', (e) => {
-      if (!startMarker) {
-        startMarker = createDraggableMarker(e.latlng, '🚦 نقطة البداية');
-      } else if (!endMarker) {
-        endMarker = createDraggableMarker(e.latlng, '🏁 نقطة النهاية');
-      }
+    // إضافة المعالم للطبقات
+    allPlaces.forEach((p, i) => {
+      let group, popup;
+      if (p.type === "آثار فرعونية") group = layerGroups.pharaonic;
+      else if (p.type === "آثار قبطية") group = layerGroups.coptic;
+      else if (p.type === "مسجد") group = layerGroups.mosque;
+      else if (p.type === "فندق") group = layerGroups.hotel;
+      else if (p.type === "مكان ترفيهي") group = layerGroups.entertain;
+
+      popup = `<b>${p.name}</b><br><img src="${p.img}" alt="${p.name}">`;
+      if (p.type === "فندق" && p.link)
+        popup += `<br><a href="${p.link}" target="_blank">رابط الحجز</a>`;
+
+      const marker = L.marker([p.lat, p.lng], {icon: icons[p.type]}).bindPopup(popup);
+      marker.addTo(group);
+
+      // إضافة الوجهة لقائمة الاختيار
+      const destSel = document.getElementById('destinationSelect');
+      const opt = document.createElement('option');
+      opt.value = `${p.lat},${p.lng}`;
+      opt.textContent = p.name + " (" + p.type + ")";
+      destSel.appendChild(opt);
     });
 
-    // 2. جلب بيانات الخدمات من Overpass API
-    const fetchServices = (serviceType) => {
-      // إزالة الماركرات السابقة
-      serviceMarkers.forEach(marker => map.removeLayer(marker));
-      serviceMarkers = [];
-
-      let overpassQuery = '';
-      let emoji = '';
-      switch (serviceType) {
-        case 'health':
-          overpassQuery = `[out:json];node["amenity"="hospital"](around:5000,30.0444,31.2357);out;`;
-          emoji = '🏥';
-          break;
-        case 'education':
-          overpassQuery = `[out:json];node["amenity"="school"](around:5000,30.0444,31.2357);out;`;
-          emoji = '🏫';
-          break;
-        case 'commercial':
-          overpassQuery = `[out:json];node["shop"](around:5000,30.0444,31.2357);out;`;
-          emoji = '🛒';
-          break;
-        default:
-          return;
+    // إظهار/إخفاء الطبقات حسب الزر
+    function showLayer(layer) {
+      for (let key in layerGroups) {
+        map.removeLayer(layerGroups[key]);
       }
+      if (layer === "all") {
+        for (let key in layerGroups) map.addLayer(layerGroups[key]);
+      } else {
+        map.addLayer(layerGroups[layer]);
+      }
+    }
 
-      const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+    document.getElementById("pharaonicBtn").onclick = () => showLayer("pharaonic");
+    document.getElementById("copticBtn").onclick = () => showLayer("coptic");
+    document.getElementById("mosqueBtn").onclick = () => showLayer("mosque");
+    document.getElementById("hotelBtn").onclick = () => showLayer("hotel");
+    document.getElementById("entertainBtn").onclick = () => showLayer("entertain");
 
-      fetch(overpassUrl)
-        .then(response => response.json())
-        .then(data => {
-          data.elements.forEach(element => {
-            const marker = L.marker([element.lat, element.lon])
-              .bindPopup(`${emoji} ${element.tags.name || 'بدون اسم'}`)
-              .addTo(map);
-            serviceMarkers.push(marker);
-          });
-        })
-        .catch(error => console.error('خطأ في استرجاع البيانات:', error));
-    };
+    // متغيرات مسار الطريق
+    let routingControl = null;
 
-    // 3. تحليل: أفضل طريق
-    document.getElementById('routeBtn').onclick = () => {
-      if (!startMarker || !endMarker) {
-        alert('يرجى اختيار نقطتي البداية والنهاية!');
+    // دالة لمسح الطريق السابق
+    function clearRoute() {
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+      }
+      document.getElementById("routeDetails").style.display = "none";
+      document.getElementById("routeDetails").innerHTML = "";
+    }
+
+    // زر أفضل طريق (استخدام Leaflet Routing Machine)
+    document.getElementById("routeBtn").onclick = () => {
+      clearRoute();
+
+      const select = document.getElementById("destinationSelect");
+      const val = select.value;
+
+      if (!val) {
+        alert("يرجى اختيار وجهة من القائمة.");
         return;
       }
-      const startCoords = startMarker.getLatLng();
-      const endCoords = endMarker.getLatLng();
 
-      const routeUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`;
+      const [destLat, destLng] = val.split(",").map(Number);
 
-      fetch(routeUrl)
-        .then(response => response.json())
-        .then(data => {
-          const routeCoordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-          if (routeLayer) map.removeLayer(routeLayer);
-          routeLayer = L.polyline(routeCoordinates, { color: 'blue', weight: 4 }).addTo(map);
-        })
-        .catch(error => console.error('خطأ في استرجاع البيانات:', error));
-    };
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(startPoint.lat, startPoint.lng),
+          L.latLng(destLat, destLng),
+        ],
+        lineOptions: {
+          styles: [{ color: "blue", opacity: 0.7, weight: 5 }],
+        },
+        createMarker: (i, wp) => {
+          if (i === 0) {
+            return L.marker(wp.latLng, { icon: L.icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/252/252025.png", iconSize: [25, 41] }), draggable: false }).bindPopup("🚦 نقطة البداية").openPopup();
+          } else if (i === 1) {
+            return L.marker(wp.latLng, { icon: L.icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854894.png", iconSize: [25, 41] }), draggable: false }).bindPopup("🏁 الوجهة").openPopup();
+          }
+          return null;
+        },
+        addWaypoints: false,
+        routeWhileDragging: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+      }).addTo(map);
 
-    // 4. إضافة نقطة مخصصة
-    document.getElementById('addPointBtn').onclick = () => {
-      map.once('click', (e) => {
-        const customMarker = createDraggableMarker(e.latlng, '📍 نقطة مخصصة');
-        customMarker.on('click', () => {
-          alert('تحليل النقطة المخصصة');
-        });
+      routingControl.on('routesfound', function (e) {
+        const route = e.routes[0];
+        const summary = route.summary;
+
+        const details = document.getElementById("routeDetails");
+        details.style.display = "block";
+        details.innerHTML = `
+          <b>المسافة:</b> ${(summary.totalDistance / 1000).toFixed(2)} كم<br>
+          <b>الوقت التقريبي:</b> ${(summary.totalTime / 60).toFixed(0)} دقيقة<br>
+          <b>نوع الطريق:</b> أقصر وأفضل طريق حسب الخريطة.
+        `;
       });
-      alert('انقر على الخريطة لإضافة نقطة مخصصة.');
     };
 
-    // 5. أزرار الخدمات
-    document.getElementById('healthBtn').onclick = () => fetchServices('health');
-    document.getElementById('educationBtn').onclick = () => fetchServices('education');
-    document.getElementById('commercialBtn').onclick = () => fetchServices('commercial');
+    // في البداية نعرض جميع الأماكن
+    showLayer("all");
   </script>
 </body>
 </html>
-
